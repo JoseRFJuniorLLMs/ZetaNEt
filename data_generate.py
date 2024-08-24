@@ -1,29 +1,71 @@
 import numpy as np
 import pandas as pd
-from mpmath import zeta
+import time
+from multiprocessing import Pool, cpu_count
 
+
+# Função para calcular a função zeta
+def zeta(s):
+    sum = 0.0
+    n = 1
+    term = 1.0 / n ** s
+
+    while term > 1e-10:  # Continua até o termo ser muito pequeno
+        sum += term
+        n += 1
+        term = 1.0 / n ** s
+
+    return sum
+
+
+# Função para gerar um pedaço do dataset zeta
+def generate_zeta_chunk(params, start_idx, end_idx):
+    start, step = params['start'], params['step']
+
+    # Cria um array de valores s
+    s_values = np.arange(start + start_idx * step, start + end_idx * step, step)
+    # Calcula os valores da função zeta para cada valor de s
+    zeta_values = np.array([zeta(s) for s in s_values])
+
+    # Retorna um DataFrame com os resultados
+    return pd.DataFrame({"s": s_values, "zeta(s)": zeta_values})
+
+
+# Função principal para gerar o dataset
 def generate_zeta_dataset(start, end, step, filename):
-    # Gerar uma lista de valores de s
-    s_values = np.arange(start, end + step, step)
-    
-    # Calcular os valores correspondentes de zeta(s)
-    zeta_values = [float(zeta(s)) for s in s_values]
-    
-    # Criar um DataFrame para armazenar os resultados
-    df = pd.DataFrame({
-        's': s_values,
-        'zeta(s)': zeta_values
-    })
-    
-    # Salvar o DataFrame em um arquivo CSV
-    df.to_csv(filename, index=False)
-    print(f"Dataset salvo como {filename}")
+    params = {'start': start, 'end': end, 'step': step}
+    num_points = int((end - start) / step)  # Número total de pontos a serem gerados
+    chunk_size = (num_points + cpu_count() - 1) // cpu_count()  # Divide o trabalho em chunks para cada núcleo
 
-# Configurações do dataset
-start_s = 1.0   # Valor inicial de s
-end_s = 2.0     # Valor final de s
-step_s = 0.01   # Incremento de s
-filename = "zeta_dataset.csv"
+    def chunk_args(start_idx, end_idx):
+        return (params, start_idx, end_idx)
 
-# Gerar o dataset
-generate_zeta_dataset(start_s, end_s, step_s, filename)
+    with Pool(cpu_count()) as pool:
+        # Gera os chunks de dados em paralelo
+        results = pool.starmap(generate_zeta_chunk, [(chunk_args(i, min(i + chunk_size, num_points))) for i in
+                                                     range(0, num_points, chunk_size)])
+
+    # Concatena todos os DataFrames dos chunks
+    df = pd.concat(results)
+    df.to_csv(filename, index=False)  # Salva o DataFrame em um arquivo CSV
+    print("Dataset salvo como", filename)
+
+
+# Função principal do programa
+def main():
+    start_time = time.time()
+
+    start_s = 1.0  # Início do intervalo para s
+    end_s = 2.0  # Fim do intervalo para s
+    step_s = (end_s - start_s) / 62500000  # Passo para gerar aproximadamente 1 GB de dados
+    filename = "zeta_dataset.csv"  # Nome do arquivo para salvar os dados
+
+    # Gera o dataset e o salva no arquivo
+    generate_zeta_dataset(start_s, end_s, step_s, filename)
+
+    end_time = time.time()
+    print("Tempo de execução:", (end_time - start_time), "segundos")  # Exibe o tempo total de execução
+
+
+if __name__ == "__main__":
+    main()

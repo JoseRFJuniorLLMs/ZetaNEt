@@ -1,103 +1,96 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+from time import time
 
-# Define the dataset class
-class RiemannZetaDataset(Dataset):
-    def __init__(self, csv_file):
-        self.data = pd.read_csv(csv_file)
-        self.s_values = torch.tensor(self.data['s'].values, dtype=torch.float32).unsqueeze(1)
-        self.zeta_values = torch.tensor(self.data['zeta(s)'].values, dtype=torch.float32).unsqueeze(1)
 
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        return self.s_values[idx], self.zeta_values[idx]
-
-# Define the neural network model
-class RiemannZetaNet(nn.Module):
-    def __init__(self):
-        super(RiemannZetaNet, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(1, 64),
-            nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1)
-        )
+# Definindo a arquitetura da rede neural usando PyTorch
+class NeuralNetwork(nn.Module):
+    def __init__(self, layer_sizes):
+        super(NeuralNetwork, self).__init__()
+        layers = []
+        for i in range(len(layer_sizes) - 1):
+            layers.append(nn.Linear(layer_sizes[i], layer_sizes[i + 1]))
+            if i < len(layer_sizes) - 2:
+                layers.append(nn.ReLU())
+        self.network = nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.layers(x)
+        return self.network(x)
 
-# Function to train the model
-def train_model(model, train_loader, criterion, optimizer, num_epochs):
-    model.train()
-    for epoch in range(num_epochs):
-        running_loss = 0.0
-        for s, zeta in train_loader:
-            optimizer.zero_grad()
-            outputs = model(s)
-            loss = criterion(outputs, zeta)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-        
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
 
-# Function to evaluate the model
-def evaluate_model(model, test_loader):
-    model.eval()
-    predictions = []
-    actuals = []
-    with torch.no_grad():
-        for s, zeta in test_loader:
-            outputs = model(s)
-            predictions.extend(outputs.numpy().flatten())
-            actuals.extend(zeta.numpy().flatten())
-    
-    return predictions, actuals
+# Função para calcular o erro quadrático médio
+def mean_squared_error(predictions, targets):
+    return nn.MSELoss()(predictions, targets)
 
-# Main function to run the entire process
-def main():
-    # Load and prepare the data
-    dataset = RiemannZetaDataset('zeta_dataset.csv')
-    train_size = int(0.8 * len(dataset))
-    test_size = len(dataset) - train_size
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
-    
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-    # Initialize the model, loss function, and optimizer
-    model = RiemannZetaNet()
+# Função para treinar o modelo
+def train_model(model, x_train, y_train, learning_rate, epochs):
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
-    # Train the model
-    num_epochs = 100
-    train_model(model, train_loader, criterion, optimizer, num_epochs)
+    model.train()
+    for epoch in range(epochs):
+        optimizer.zero_grad()
+        predictions = model(x_train)
+        loss = criterion(predictions, y_train)
+        loss.backward()
+        optimizer.step()
 
-    # Evaluate the model
-    predictions, actuals = evaluate_model(model, test_loader)
+        # Exibir perda a cada 10 épocas
+        if (epoch + 1) % 10 == 0:
+            print(f"Epoch {epoch + 1}, Loss: {loss.item()}")
 
-    # Plot the results
-    plt.figure(figsize=(10, 6))
-    plt.scatter(dataset.s_values, dataset.zeta_values, color='blue', label='Actual', alpha=0.5)
-    plt.scatter(dataset.s_values[test_size:], predictions, color='red', label='Predicted', alpha=0.5)
-    plt.xlabel('s')
-    plt.ylabel('zeta(s)')
-    plt.title('Riemann Zeta Function: Actual vs Predicted')
-    plt.legend()
-    plt.savefig('riemann_zeta_plot.png')
-    plt.close()
 
-    print("Training and evaluation complete. Results plotted in 'riemann_zeta_plot.png'")
+# Função principal
+def main():
+    start_time = time()
+
+    # Carregar dados
+    data = pd.read_csv("large_dataset.csv")
+    x_data = torch.tensor(data['s'].values.reshape(-1, 1), dtype=torch.float32)
+    y_data = torch.tensor(data['zeta(s)'].values.reshape(-1, 1), dtype=torch.float32)
+
+    # Normalizar dados
+    x_mean = x_data.mean()
+    x_std = x_data.std()
+    y_mean = y_data.mean()
+    y_std = y_data.std()
+    x_data = (x_data - x_mean) / x_std
+    y_data = (y_data - y_mean) / y_std
+
+    # Criar e treinar o modelo
+    layer_sizes = [1, 64, 64, 32, 1]
+    model = NeuralNetwork(layer_sizes)
+    train_model(model, x_data, y_data, 0.01, 100)
+
+    # Avaliar o modelo
+    model.eval()
+    with torch.no_grad():
+        predictions = model(x_data)
+        mse = mean_squared_error(predictions, y_data)
+        print("Mean Squared Error:", mse.item())
+
+        # Denormalizar previsões para plotagem
+        denorm_predictions = predictions * y_std + y_mean
+
+        # Plotar resultados
+        plt.figure(figsize=(10, 6))
+        plt.scatter(data['s'], data['zeta(s)'], color='blue', label='Real', alpha=0.5)
+        plt.scatter(data['s'], denorm_predictions.numpy(), color='red', label='Previsto', alpha=0.5)
+        plt.xlabel('s')
+        plt.ylabel('zeta(s)')
+        plt.title('Função Zeta de Riemann: Real vs Previsto')
+        plt.legend()
+        plt.savefig('riemann_zeta_plot_pytorch.png')
+        plt.close()
+
+    end_time = time()
+    print("Tempo de execução:", (end_time - start_time), "segundos")
+
 
 if __name__ == "__main__":
     main()
