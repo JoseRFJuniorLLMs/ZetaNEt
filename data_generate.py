@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import time
 from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
 
 
 # Função para calcular a função zeta
@@ -41,9 +42,15 @@ def generate_zeta_dataset(start, end, step, filename):
         return (params, start_idx, end_idx)
 
     with Pool(cpu_count()) as pool:
-        # Gera os chunks de dados em paralelo
-        results = pool.starmap(generate_zeta_chunk, [(chunk_args(i, min(i + chunk_size, num_points))) for i in
-                                                     range(0, num_points, chunk_size)])
+        # Gera os chunks de dados em paralelo com progresso
+        results = []
+        for chunk in tqdm(range(0, num_points, chunk_size), desc="Generating chunks", unit="chunk"):
+            start_idx = chunk
+            end_idx = min(start_idx + chunk_size, num_points)
+            results.append(pool.apply_async(generate_zeta_chunk, chunk_args(start_idx, end_idx)))
+
+        # Coleta os resultados
+        results = [r.get() for r in results]
 
     # Concatena todos os DataFrames dos chunks
     df = pd.concat(results)
