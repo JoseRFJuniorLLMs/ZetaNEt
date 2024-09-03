@@ -1,11 +1,22 @@
+import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
+# Função para limpar e formatar strings complexas
+def parse_complex(value):
+    value = value.strip()
+    if 'j' not in value:
+        value += 'j'
+    value = value.replace(',', '.')
+    value = value.replace('(', '').replace(')', '')
+    try:
+        return complex(value)
+    except ValueError:
+        return np.nan
 
 # Definindo a arquitetura da rede neural usando PyTorch
 class NeuralNetwork(nn.Module):
@@ -21,11 +32,9 @@ class NeuralNetwork(nn.Module):
     def forward(self, x):
         return self.network(x)
 
-
 # Função para calcular o erro quadrático médio
 def mean_squared_error(predictions, targets):
     return nn.MSELoss()(predictions, targets)
-
 
 # Função para treinar o modelo
 def train_model(model, x_train, y_train, learning_rate, epochs):
@@ -40,30 +49,50 @@ def train_model(model, x_train, y_train, learning_rate, epochs):
         loss.backward()
         optimizer.step()
 
-        # Exibir perda a cada 10 épocas
         if (epoch + 1) % 10 == 0:
             print(f"Epoch {epoch + 1}, Loss: {loss.item()}")
-
 
 # Função principal
 def main():
     start_time = time()
 
     # Carregar dados
-    data = pd.read_csv("large_dataset.csv")
-    x_data = torch.tensor(data['s'].values.reshape(-1, 1), dtype=torch.float32)
-    y_data = torch.tensor(data['zeta(s)'].values.reshape(-1, 1), dtype=torch.float32)
+    data = pd.read_csv("/content/combined_zeta_data.csv")
+
+    # Limpar e formatar dados complexos
+    data['s'] = data['s'].apply(parse_complex)
+    data['zeta(s)'] = data['zeta(s)'].apply(parse_complex)
+
+    # Verificar valores inválidos após a conversão
+    if data['s'].isnull().any() or data['zeta(s)'].isnull().any():
+        invalid_s = data[data['s'].isnull()]
+        invalid_zeta = data[data['zeta(s)'].isnull()]
+        print("Valores inválidos na coluna 's':")
+        print(invalid_s)
+        print("\nValores inválidos na coluna 'zeta(s)']:")
+        print(invalid_zeta)
+        return
+
+    # Separar parte real e imaginária
+    data['s_real'] = data['s'].apply(lambda x: x.real)
+    data['s_imag'] = data['s'].apply(lambda x: x.imag)
+    data['zeta_real'] = data['zeta(s)'].apply(lambda x: x.real)
+    data['zeta_imag'] = data['zeta(s)'].apply(lambda x: x.imag)
+
+    # Converter para tensores
+    x_data = torch.tensor(data[['s_real', 's_imag']].values, dtype=torch.float32)
+    y_data = torch.tensor(data[['zeta_real', 'zeta_imag']].values, dtype=torch.float32)
 
     # Normalizar dados
-    x_mean = x_data.mean()
-    x_std = x_data.std()
-    y_mean = y_data.mean()
-    y_std = y_data.std()
+    x_mean = x_data.mean(dim=0)
+    x_std = x_data.std(dim=0)
+    y_mean = y_data.mean(dim=0)
+    y_std = y_data.std(dim=0)
     x_data = (x_data - x_mean) / x_std
     y_data = (y_data - y_mean) / y_std
 
     # Criar e treinar o modelo
-    layer_sizes = [1, 64, 64, 32, 1]
+    layer_sizes = [2, 64, 64, 32, 2]
     model = NeuralNetwork(layer_sizes)
     train_model(model, x_data, y_data, 0.01, 100)
 
@@ -79,8 +108,8 @@ def main():
 
         # Plotar resultados
         plt.figure(figsize=(10, 6))
-        plt.scatter(data['s'], data['zeta(s)'], color='blue', label='Real', alpha=0.5)
-        plt.scatter(data['s'], denorm_predictions.numpy(), color='red', label='Previsto', alpha=0.5)
+        plt.scatter(data['s_real'] + 1j * data['s_imag'], data['zeta_real'] + 1j * data['zeta_imag'], color='blue', label='Real', alpha=0.5)
+        plt.scatter(denorm_predictions[:, 0] + 1j * denorm_predictions[:, 1], color='red', label='Previsto', alpha=0.5)
         plt.xlabel('s')
         plt.ylabel('zeta(s)')
         plt.title('Função Zeta de Riemann: Real vs Previsto')
@@ -90,7 +119,6 @@ def main():
 
     end_time = time()
     print("Tempo de execução:", (end_time - start_time), "segundos")
-
 
 if __name__ == "__main__":
     main()

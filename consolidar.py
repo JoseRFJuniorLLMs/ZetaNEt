@@ -27,11 +27,11 @@ def process_zeros(zeros):
 def main():
     # Usar os nomes de arquivo exatos que você tem no projeto
     files = [
-        "zeros1.txt",
-        "zeros2.txt",
-        "zeros3.txt",
-        "zeros4.txt",
-        "zeros5.txt"
+        "content/zeros1.txt",
+        "content/zeros2.txt",
+        "content/zeros3.txt",
+        "content/zeros4.txt",
+        "content/zeros5.txt"
     ]
 
     all_data = []
@@ -45,7 +45,7 @@ def main():
 
     if all_data:
         combined_data = pd.concat(all_data, ignore_index=True)
-        output_file = "combined_zeta_data.csv"
+        output_file = "content/combined_zeta_data.csv"
         combined_data.to_csv(output_file, index=False)
         print(f"Consolidação de dados concluída. Saída salva em '{output_file}'")
     else:
