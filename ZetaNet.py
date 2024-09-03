@@ -88,13 +88,15 @@ def main():
     x_std = x_data.std(dim=0)
     y_mean = y_data.mean(dim=0)
     y_std = y_data.std(dim=0)
+    x_std[x_std == 0] = 1  # Evitar divisão por zero
+    y_std[y_std == 0] = 1  # Evitar divisão por zero
     x_data = (x_data - x_mean) / x_std
     y_data = (y_data - y_mean) / y_std
 
     # Criar e treinar o modelo
     layer_sizes = [2, 64, 64, 32, 2]
     model = NeuralNetwork(layer_sizes)
-    train_model(model, x_data, y_data, 0.01, 100)
+    train_model(model, x_data, y_data, 0.001, 100)  # Ajuste o learning rate para 0.001
 
     # Avaliar o modelo
     model.eval()
@@ -108,10 +110,10 @@ def main():
 
         # Plotar resultados
         plt.figure(figsize=(10, 6))
-        plt.scatter(data['s_real'] + 1j * data['s_imag'], data['zeta_real'] + 1j * data['zeta_imag'], color='blue', label='Real', alpha=0.5)
-        plt.scatter(denorm_predictions[:, 0] + 1j * denorm_predictions[:, 1], color='red', label='Previsto', alpha=0.5)
-        plt.xlabel('s')
-        plt.ylabel('zeta(s)')
+        plt.scatter(data['s_real'], data['s_imag'], color='blue', label='Real')
+        plt.scatter(denorm_predictions[:, 0], denorm_predictions[:, 1], color='red', label='Previsto')
+        plt.xlabel('Parte Real')
+        plt.ylabel('Parte Imaginária')
         plt.title('Função Zeta de Riemann: Real vs Previsto')
         plt.legend()
         plt.savefig('riemann_zeta_plot_pytorch.png')
