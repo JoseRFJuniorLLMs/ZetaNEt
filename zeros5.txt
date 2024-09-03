@@ -1,12 +1,3 @@
-Values of gamma - 1370919909931995300000, where gamma runs over the heights
-of the zeros of the Riemann zeta numbered 10^22 + 1 through 10^22 + 10^4.
-Thus zero # 10^22 + 1 is actually
-
-      1/2 + i * 1,370,919,909,931,995,308,226.68016095...
-
-Values are not guaranteed, and are probably accurate to within 10^(-6).
-
-
    8226.68016095
    8226.77659152
    8226.94593324

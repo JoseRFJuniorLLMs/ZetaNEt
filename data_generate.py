@@ -64,7 +64,7 @@ def main():
 
     start_s = 1.0  # Início do intervalo para s
     end_s = 2.0  # Fim do intervalo para s
-    step_s = (end_s - start_s) / 62500000  # Passo para gerar aproximadamente 1 GB de dados
+    step_s = (end_s - start_s) / 6250  # 62500000 Passo para gerar aproximadamente 1 GB de dados
     filename = "zeta_dataset.csv"  # Nome do arquivo para salvar os dados
 
     # Gera o dataset e o salva no arquivo
