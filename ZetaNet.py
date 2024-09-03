@@ -108,16 +108,22 @@ def main():
         # Denormalizar previsões para plotagem
         denorm_predictions = predictions * y_std + y_mean
 
+        # Verificar dados para plotagem
+        print("Dados Reais:")
+        print(data[['s_real', 's_imag']].head())
+        print("Previsões Denormalizadas:")
+        print(denorm_predictions[:5])
+
         # Plotar resultados
         plt.figure(figsize=(10, 6))
-        plt.scatter(data['s_real'], data['s_imag'], color='blue', label='Real')
-        plt.scatter(denorm_predictions[:, 0], denorm_predictions[:, 1], color='red', label='Previsto')
+        plt.scatter(data['s_real'], data['s_imag'], color='blue', label='Real', alpha=0.5)
+        plt.scatter(denorm_predictions[:, 0], denorm_predictions[:, 1], color='red', label='Previsto', alpha=0.5)
         plt.xlabel('Parte Real')
         plt.ylabel('Parte Imaginária')
         plt.title('Função Zeta de Riemann: Real vs Previsto')
         plt.legend()
         plt.savefig('riemann_zeta_plot_pytorch.png')
-        plt.close()
+        plt.show()  # Exibe o gráfico diretamente se estiver usando um notebook
 
     end_time = time()
     print("Tempo de execução:", (end_time - start_time), "segundos")
